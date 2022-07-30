@@ -19,6 +19,7 @@
         "serve": "gatsby serve",
         "clean": "gatsby clean",
         "typecheck": "tsc --noEmit",
+        "test": "jest",
         "format": "prettier --write --ignore-unknown .",
         "prepare": "husky install",
         "lint": "eslint --fix --ext .js,.jsx,.ts,.tsx ."
