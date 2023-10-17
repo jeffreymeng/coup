@@ -1,0 +1,17 @@
+{
+    "name": "coup-engine",
+    "version": "1.0.0",
+    "description": "Core gameplay logic for coup",
+    "main": "build/index.js",
+    "scripts": {
+        "clean": "rm -rf build tsconfig.tsbuildinfo",
+        "build": "tsc --incremental",
+        "start:dev": "tsc -w --incremental"
+    },
+    "keywords": [],
+    "author": "Jeffrey Meng <jeffkmeng@gmail.com>",
+    "license": "MIT",
+    "devDependencies": {
+        "typescript": "^4.7.3"
+    }
+}
