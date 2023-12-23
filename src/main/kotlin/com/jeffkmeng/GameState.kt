@@ -1,56 +1,12 @@
-/**
- * All the information for the current game state
- */
-abstract class GameState {
-    /**
-     * Returns the UI state for a given player.
-     */
-    abstract fun getUIStateForPlayer(player: Player): UIState
-}
-
-/**
- * The actual game engine with all the logic. Every game will have one
- * instance of this in memory.
- *
- * Every game variant extends off a base GameEngine. The simplest variants
- * that have no logic changes can simply override GameVariant to change
- * characters / actions.
- */
-abstract class GameEngine {
-    /**
-     * Variant information (ie. characters + actions) for this game
-     */
-    abstract val variant: GameVariant
-
-    class GameEngine(val players: Array<Player>)
-
-    // todo: things like executeAction(), etc
-}
-
-/**
- * Information for a player that the user provides to us when creating the game
- * Things like name, etc
- */
-interface PlayerInformation {
-    val name: String
-}
-
-/**
- * All the information necessary for one client to render the game
- * for one particular player. No sensitive information can be exposed here.
- */
-interface UIState {
-    // idk. also note that this interface will be duplicated here and again in TypeScript
-    // and everything here needs to be serializable. Maybe protobuf?
-}
+package com.jeffkmeng
 
 /**
  * Information for a player for the actual game state.
  * Includes things like how much money they have, etc
  */
-class Player {
-    var money = 2
-    class Player(val information: PlayerInformation, val characters: Array<Character>)
+data class Player(val user: User, var cards: List<Character>) {
+    var coins = 2
+
 }
 
 /**
@@ -67,13 +23,22 @@ abstract class Action {
     /**
      * If the given player executed the action and was challenged, do they lose a life?
      */
-    abstract fun isLegitimate(gameState: GameState, player: Player): Boolean
+    fun isLegitimate(state: GameState, player: Player): Boolean =
+        player.cards.any{it.isAlive && this in it.actions}
+
+    abstract fun resolve(state: GameState)
+    // TODO: should this return a new GameState or just mutate the existing one?
+    // returning a new one might be annoying with having to copy all the players, so mutating might
+    // be easier?
 }
 
 /**
  * One character in Coup, like Captain or Duke
  */
 abstract class Character {
+    companion object {
+        abstract fun doSomething()
+    }
     /**
      * What actions can this character execute?
      * Ex. Duke can execute Tax
@@ -85,19 +50,18 @@ abstract class Character {
      * Ex. Duke can block Foreign Aid
      */
     abstract val blockedActions: Array<Action>
+
+    var isAlive = true
 }
 
 /**
- * Every variant implements this
+ * All the information for the current game state
  */
-interface GameVariant {
+data class GameState(val players: List<Player>) {
     /**
-     * Which characters are included in this game variant
+     * Returns the UI state for a given player.
      */
-    val characters: Array<Character>
-
-    /**
-     * Any actions that aren't specific to a character (ex. Income, Coup)
-     */
-    val baseActions: Array<Action>
+    fun getUIStateForPlayer(player: Player): UIState {
+        return UIState()
+    }
 }
