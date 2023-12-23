@@ -6,7 +6,7 @@ abstract class GameEngine(val players: List<Player>) {
     /**
      * Which characters are included in this game variant
      */
-    abstract val characters: List<KClass<Character>>
+    abstract val characters: List<Character>
 
     /**
      * Any actions that aren't specific to a character (ex. Income, Coup)
