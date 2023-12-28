@@ -1,8 +1,8 @@
-package com.jeffkmeng
+package com.jeffkmeng.engine
 
-import kotlin.reflect.KClass
+import com.jeffkmeng.*
 
-abstract class GameEngine(
+abstract class Engine(
     val users: List<User>,
     /**
      * Which characters are included in this game variant
@@ -11,13 +11,13 @@ abstract class GameEngine(
     /**
      * Any actions that aren't specific to a character (ex. Income, Coup)
      */
-    val baseActions: List<Action>
+    val baseActions: List<ActionManifest>
 ) {
-    val actions: List<Action> = baseActions + characters.flatMap{it.actions}
+    val actions: List<ActionManifest> = baseActions + characters.flatMap{it.actions}
 
-    val players: List<Player> = users.map{Player(it, listOf())}
+    val players: List<Player> = users.map{ Player(it, listOf()) }
 
-    val state: GameState = GameState(players)
+    val state: State = State(players)
 
     fun getUIStateForUser(user: User): UIState {
         val player = players.find { it.user == user }

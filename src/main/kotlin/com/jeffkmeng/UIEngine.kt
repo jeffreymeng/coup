@@ -7,12 +7,7 @@ data class User(val id: String, val name: String) {
 
 }
 
-/**
- * the stage of the turn (e.g. pick action, await block, await challenge)
- */
-enum class Status {
 
-}
 
 /**
  * All the information necessary for one client to render the game
