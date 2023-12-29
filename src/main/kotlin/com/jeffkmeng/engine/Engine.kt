@@ -13,19 +13,27 @@ abstract class Engine(
      */
     val baseActions: List<ActionManifest>
 ) {
-    val actions: List<ActionManifest> = baseActions + characters.flatMap{it.actions}
+    val actions: List<ActionManifest>
+        get() = baseActions + characters.flatMap { it.actions }
 
-    val players: List<Player> = users.map{ Player(it, listOf()) }
+    val players: List<Player>
+    val deck: List<Character>
 
-    val state: State = State(players)
+    init {
+        // TODO: how do you design this in a way that can be overwritten? e.g. if you only wanted to deal one card to each person
+        val cards = characters.flatMap { character -> MutableList(3) { character } }.shuffled().iterator()
+        players = users.map { Player(it, List(2) { cards.next() }) }
+        deck = cards.asSequence().toList()
+    }
+
+    val state: State = State(players, deck)
+
 
     fun getUIStateForUser(user: User): UIState {
-        val player = players.find { it.user == user }
-        if (player == null) {
-            throw Exception("Couldn't find player corresponding to $user")
-        }
+        val player = players.find { it.user == user } ?: throw Exception("Couldn't find player corresponding to $user")
         return state.getUIStateForPlayer(player)
     }
+
 
     // todo: things like executeAction(), etc
     // todo: maybe a debug print formatter?
