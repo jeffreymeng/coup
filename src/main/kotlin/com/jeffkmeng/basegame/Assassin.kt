@@ -2,7 +2,15 @@ package com.jeffkmeng.basegame
 
 import com.jeffkmeng.engine.*
 
-class AssassinateAction(actor: Player, target: Player) : TargetedAction(actor, target) {
+class AssassinatePayload(val card: Character) : ActionPayload() {
+
+}
+
+class AssassinateAction(actor: Player, override val target: Player) : Action(actor), TargetedAction {
+    override val cost = 3
+    override val canBeBlocked = true
+    override val canBeChallenged = true
+
     companion object {
         val MANIFEST = ActionManifest(
             "Assassinate",
@@ -14,13 +22,18 @@ class AssassinateAction(actor: Player, target: Player) : TargetedAction(actor, t
     override val id = "assassinate"
 
     override fun isLegal(state: State) = actor.coins >= 3
-    override fun resolve(state: State) {
-        // TODO how do we implement this?
-        // askTargetToSelectALifeToLose():Card.isAlive = false
+    override fun resolve(state: State, payload: ActionPayload?) {
+        if (payload !is AssassinatePayload) {
+            throw Exception("Invalid payload")
+        }
+        val card = target.liveCards.find { it == payload.card } ?: throw Exception("Card to eliminate not found in player")
+        card.isAlive = false
     }
+
+    override fun getResolveWaitingOn() = setOf(target)
 }
 
-class AssassinCharacter : Character() {
+class AssassinCharacter(id: Int) : Character(id) {
     override val actions: List<ActionManifest> = listOf(AssassinateAction.MANIFEST)
     override val blockedActions: List<Action> = listOf()
 }

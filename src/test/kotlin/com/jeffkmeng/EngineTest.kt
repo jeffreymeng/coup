@@ -19,8 +19,10 @@ class EngineTest {
             listOf(alice, bob)
         )
         assertEquals(game.state.status, State.Status.SELECT_ACTION)
-//        assertEquals(game.getUIStateForUser(alice), UIState(......))
 
-        // game.onActionSelected() 
+        game.receiveEvent()
+//        assertEquals(game.getUIState(alice), UIState(......))
+
+        // game.onActionSelected()
     }
 }

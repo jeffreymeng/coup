@@ -2,14 +2,22 @@ package com.jeffkmeng.engine
 
 import io.ktor.util.reflect.*
 import kotlin.reflect.KClass
+import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.primaryConstructor
 
+open class ActionPayload {
+
+}
 
 /**
  * Ex. Tax, Income, Foreign Aid, Coup, etc
  */
 abstract class Action(public val actor: Player) {
     abstract val id: String; // TODO: what is the id used for?
+    abstract val canBeBlocked: Boolean
+    abstract val canBeChallenged: Boolean
+
+    open val cost: Int = 0
 
     /**
      * Is the given player allowed to execute this action? ie. do they have enough money?
@@ -23,16 +31,21 @@ abstract class Action(public val actor: Player) {
         actor.liveCards.flatMap { it.actions }.any { this::class == it.reference }
 
     /**
-     * Performs the action, mutating the state as necessary.
+     * Performs the action, mutating state as necessary.
      */
-    abstract fun resolve(state: State)
+    abstract fun resolve(state: State, payload: ActionPayload?)
+
+    open fun getResolveWaitingOn() = mutableSetOf<Player>()
 }
 
-abstract class TargetedAction(actor: Player, val target: Player) : Action(actor)
+interface TargetedAction {
+    val target: Player
+}
+
 
 data class ActionManifest(
     val name: String,
     val description: String,
     val reference: KClass<out Action>,
-    val isTargeted: Boolean = reference.instanceOf(TargetedAction::class)
+//    val isTargeted: Boolean = reference.isSubclassOf(TargetedAction::class) // TODO fix if broken
 )
