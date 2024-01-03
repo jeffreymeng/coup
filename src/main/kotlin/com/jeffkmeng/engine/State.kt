@@ -24,3 +24,8 @@ class State(val players: List<Player>, val deck: List<Character>, startingPlayer
         return UIState(player.cards)
     }
 }
+
+/**
+ * TODO: To represent the list of challenge responses, etc., it might be best to split State into one State for each status.
+ * Then we can also implement .nextStatus() => State to return the State subclass with the next Status
+ */

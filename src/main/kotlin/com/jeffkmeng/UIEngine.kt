@@ -27,7 +27,7 @@ class UIState (val cards: List<Character>){
     // availableActions = List<Action>? // this would be null UNLESS currentPlayer == thisPlayer && status == pickAction
     // // we probably also need something for blocking and challenging?
 
-
+    // TODO: make sure the ID of a character is not exposed to the user
     override fun equals(other: Any?): Boolean {
         return other is UIState && other.cards == this.cards
     }
