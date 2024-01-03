@@ -14,7 +14,7 @@ open class ActionPayload {
  */
 abstract class Action(public val actor: Player) {
     abstract val id: String; // TODO: what is the id used for?
-    abstract val canBeBlocked: Boolean
+    abstract val canBeBlocked: Boolean // TODO: can we derive this from the set of actions?
     abstract val canBeChallenged: Boolean
 
     open val cost: Int = 0
@@ -35,7 +35,7 @@ abstract class Action(public val actor: Player) {
      */
     abstract fun resolve(state: State, payload: ActionPayload?)
 
-    open fun getResolveWaitingOn() = mutableSetOf<Player>()
+    open fun getResolveWaitingOn() = setOf<Player>()
 }
 
 interface TargetedAction {

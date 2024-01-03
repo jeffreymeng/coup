@@ -1,5 +1,6 @@
 package com.jeffkmeng
 
+import com.jeffkmeng.engine.Character
 import com.jeffkmeng.engine.State
 
 /**
@@ -15,7 +16,7 @@ data class User(val id: String, val name: String) {
  * All the information necessary for one client to render the game
  * for one particular player. No sensitive information can be exposed here.
  */
-class UIState (val requests: List<State.StatusDataRequest>){
+class UIState (val cards: List<Character>){
     // idk. also note that this interface will be duplicated here and again in TypeScript
     // and everything here needs to be serializable. Maybe protobuf?
 
@@ -26,4 +27,8 @@ class UIState (val requests: List<State.StatusDataRequest>){
     // availableActions = List<Action>? // this would be null UNLESS currentPlayer == thisPlayer && status == pickAction
     // // we probably also need something for blocking and challenging?
 
+
+    override fun equals(other: Any?): Boolean {
+        return other is UIState && other.cards == this.cards
+    }
 }

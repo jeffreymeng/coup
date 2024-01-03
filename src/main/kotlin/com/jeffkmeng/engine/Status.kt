@@ -34,16 +34,7 @@ enum class Status {
     /**
      * The current player is choosing which action to perform
      */
-    SELECT_ACTION {
-        inner class Event(val action: Action) : BaseEvent() {
-            override fun update(state: State) {
-                assert(state.status == Status.SELECT_ACTION)
-                state.currentAction = action
-                action.actor.coins -= action.cost
-            }
-        }
-
-    },
+    SELECT_ACTION,
 
     /**
      * Players are deciding whether to challenge the action
@@ -67,6 +58,5 @@ enum class Status {
      * This step doesn't happen for actions that don't require player input to resolve
      */
     RESOLVE;
-
-
 }
+

@@ -2,19 +2,21 @@ package com.jeffkmeng.engine
 
 import com.jeffkmeng.*
 
-abstract class Engine(
+fun <T> ListIterator<T>.nextOr(el: T) = if (this.hasNext()) this.next() else el
+
+open class Engine(
     val users: List<User>,
     /**
-     * Which characters are included in this game variant
+     * The deck containing the initial characters of the variant.
+     * Note that the initialDeck is expected to be pre-shuffled.
      */
-    val characters: List<Character>,
+    initialDeck: List<Character>,
     /**
      * Any actions that aren't specific to a character (ex. Income, Coup)
      */
-    val baseActions: List<ActionManifest>
+    baseActions: List<ActionManifest>
 ) {
-    val actions: List<ActionManifest>
-        get() = baseActions + characters.flatMap { it.actions }
+    val actions: Set<ActionManifest> = (baseActions + initialDeck.flatMap { it.actions }).toSet()
 
 
     /**
@@ -26,51 +28,64 @@ abstract class Engine(
 
     init {
         // TODO: how do you design this in a way that can be overwritten? e.g. if you only wanted to deal one card to each person
-        val cards = characters.flatMap { character -> MutableList(3) { character } }.shuffled().iterator()
+        val cards = initialDeck.iterator()
         val players = users.map { Player(it, List(2) { cards.next() }) }
         val deck = cards.asSequence().toList()
         state = State(players, deck)
     }
 
 
-    fun receiveEvent(event: BaseEvent) {
+    fun receiveEvent(event: Event) {
         event.update(state)
         incrementStatus()
     }
 
+    fun getPlayer(user: User) =
+        state.players.find { it.user == user } ?: throw Exception("Couldn't find player corresponding to $user")
+
     fun getUIState(user: User): UIState {
-        val player =
-            state.players.find { it.user == user } ?: throw Exception("Couldn't find player corresponding to $user")
+        val player = getPlayer(user)
         return state.getUIState(player)
     }
 
-    fun incrementStatus() {
+    protected fun incrementStatus() {
         state.status = when (state.status) {
             Status.SELECT_ACTION -> Status.CHALLENGE
             Status.CHALLENGE -> Status.BLOCK
             Status.BLOCK -> Status.CHALLENGE_BLOCK
             Status.CHALLENGE_BLOCK -> Status.RESOLVE
             Status.RESOLVE -> {
-                // TODO reset turn
+                state.turn++
+                state.currentTurnPlayer =
+                    state.players.let { it.listIterator(it.indexOf(state.currentTurnPlayer)).nextOr(it.first()) }
                 Status.SELECT_ACTION
             }
         }
+
         val canSkipStatus = when (state.status) {
+            // TODO: is there a way to get the compiler to verify that when the status is not SELECT_ACTION the currentAction is not null?
+            // Maybe refactor to create a new State type for each status (e.g. SelectActionState, ChallengeState, etc)
             Status.CHALLENGE -> !state.currentAction!!.canBeChallenged
             Status.BLOCK -> !state.currentAction!!.canBeBlocked
             Status.RESOLVE -> state.currentAction!!.getResolveWaitingOn().isEmpty()
             else -> false
         }
 
-        state.waitingOn = when(state.status) {
-            Status.SELECT_ACTION -> mutableSetOf(state.turnPlayer)
+        state.waitingOn = when (state.status) {
+            Status.SELECT_ACTION -> mutableSetOf(state.currentTurnPlayer)
             Status.CHALLENGE -> state.players.toMutableSet()
-            Status.BLOCK -> if (state.currentAction is TargetedAction) mutableSetOf((state.currentAction as TargetedAction).target) else mutableSetOf()
-            Status.RESOLVE -> state.currentAction!!.getResolveWaitingOn()
+            Status.BLOCK -> state.currentAction.let { if (it is TargetedAction) mutableSetOf(it.target) else state.players.toMutableSet() }
+            Status.CHALLENGE_BLOCK -> mutableSetOf(state.currentAction!!.actor)
+            Status.RESOLVE -> state.currentAction!!.getResolveWaitingOn().toMutableSet()
         }
 
         if (canSkipStatus) {
-            if (state.status == Status.RESOLVE) {
+            if (state.status == Status.BLOCK) {
+                // if we skip the block phase, we must also skip the challenge block phase (e.g. we must skip twice, once
+                // here and once during incrementStatus())
+                state.status = Status.CHALLENGE_BLOCK
+            } else if (state.status == Status.RESOLVE) {
+                // resolve the action before moving on
                 state.currentAction!!.resolve(state, null)
             }
             incrementStatus()

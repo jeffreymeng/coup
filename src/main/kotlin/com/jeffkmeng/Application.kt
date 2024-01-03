@@ -1,6 +1,6 @@
 package com.jeffkmeng
 
-import com.jeffkmeng.basegame.BaseEngine
+import com.jeffkmeng.basegame.BaseGameEngine
 import io.ktor.server.application.*
 
 fun main() {
@@ -8,9 +8,9 @@ fun main() {
     //         .start(wait = true)
 
     val user1 = User(id = "123", name = "Nathan")
-    val gameEngine = BaseEngine(listOf(user1))
+    val gameEngine = BaseGameEngine(listOf(user1))
 
-    val initUIState = gameEngine.getUIStateForUser(user1)
+    val initUIState = gameEngine.getUIState(user1)
     println(initUIState)
 }
 
