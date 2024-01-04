@@ -15,13 +15,13 @@ class EngineTest {
             List(4) { i -> DukeCharacter(i) },
             emptyList()
         )
-        assertEquals(game.state.status, Status.SELECT_ACTION)
+        assertIs<SelectActionState>(game.state)
         assertEquals(game.state.deck, emptyList())
         assertEquals(game.getUIState(alice), UIState((0..1).map { DukeCharacter(it) }))
         assertEquals(game.getUIState(bob), UIState((2..3).map { DukeCharacter(it) }))
 
-        game.receiveEvent(SelectActionEvent(TaxAction(game.getPlayer(alice))))
-        assertEquals(game.state.status, Status.CHALLENGE)
+        game.receiveMessage(SelectActionMessage(TaxAction(game.getPlayer(alice))))
+        assertIs<ChallengeState>(game.state)
 
 
         // game.onActionSelected()

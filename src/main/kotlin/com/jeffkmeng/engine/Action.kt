@@ -27,7 +27,7 @@ abstract class Action(public val actor: Player) {
     /**
      * If the given player executed the action and was challenged, do they lose a life?
      */
-    fun isLegitimate(state: State): Boolean =
+    fun isLegitimate(): Boolean =
         actor.liveCards.flatMap { it.actions }.any { this::class == it.reference }
 
     /**
