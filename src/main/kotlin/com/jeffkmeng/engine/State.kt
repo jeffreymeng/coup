@@ -66,6 +66,11 @@ data class SelectActionState(
     override val turn: Int,
     override val currentTurnPlayer: Player
 ) : State() {
+    companion object {
+        fun create(players: List<Player>, deck: List<Character>, turn: Int, currentTurnPlayer: Player) =
+            SelectActionState(players, deck, turn, currentTurnPlayer)
+    }
+
     override val waitingOn = setOf(currentTurnPlayer)
 
     override fun receiveMessage(message: Message): State {
@@ -95,6 +100,23 @@ data class SelectCardDeathState(
      */
     val nextState: State
 ) : State() {
+    companion object {
+        fun create(
+            players: List<Player>,
+            deck: List<Character>,
+            turn: Int,
+            currentTurnPlayer: Player,
+            currentTurnAction: Action,
+            player: Player,
+            nextState: State
+        ): State {
+            // TODO: if the player to lose a card has only one card to lose, automatically kill it for them
+            // and then return WhateverTheNextStateIs.create()
+            return SelectCardDeathState(players, deck, turn, currentTurnPlayer, currentTurnAction, player, nextState)
+        }
+
+    }
+
     override val waitingOn = setOf(currentTurnPlayer)
 
     override fun receiveMessage(message: Message): State {
