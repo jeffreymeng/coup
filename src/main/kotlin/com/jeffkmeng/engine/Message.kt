@@ -26,6 +26,18 @@ class SelectCardDeathMessage(player: Player, val cardIndex: Int) : Message(playe
 class ChallengeDecisionMessage(player: Player, val isChallenging: Boolean) : Message(player)
 
 /**
+ * @param player - The player sending the event
+ * @param isBlocking - True iff the player has decided to block.
+ */
+class BlockDecisionMessage(player: Player, val isBlocking: Boolean) : Message(player)
+
+/**
+ * @param player - The player sending the event
+ * @param isBlocking - True iff the player has decided to challenge the block.
+ */
+class ChallengeBlockDecisionMessage(player: Player, val isChallenging: Boolean) : Message(player)
+
+/**
  * Thrown when an event is received that cannot be performed on the current state by the sender of the event.
  */
 class IllegalMessageException(message: String) : Exception(message)

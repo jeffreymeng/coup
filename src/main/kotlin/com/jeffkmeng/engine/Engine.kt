@@ -31,7 +31,7 @@ open class Engine(
         val cards = initialDeck.iterator()
         val players = users.map { Player(it, List(2) { cards.next() }) }
         val deck = cards.asSequence().toList()
-        state = SelectActionState(players, deck, 1, players.random())
+        state = SelectActionState.create(players, deck, 1, players.random())
     }
 
 

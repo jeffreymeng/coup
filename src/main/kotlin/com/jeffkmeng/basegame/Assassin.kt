@@ -22,15 +22,17 @@ class AssassinateAction(actor: Player, override val target: Player) : Action(act
     override val id = "assassinate"
 
     override fun isLegal(state: State) = actor.coins >= 3
+
+    override fun getResolveWaitingOn() = setOf(target)
     override fun resolve(state: State, payload: ActionPayload?) {
         if (payload !is AssassinatePayload) {
             throw Exception("Invalid payload")
         }
-        val card = target.liveCards.find { it == payload.card } ?: throw Exception("Card to eliminate not found in player")
+        val card =
+            target.liveCards.find { it == payload.card } ?: throw Exception("Card to eliminate not found in player")
         card.isAlive = false
     }
 
-    override fun getResolveWaitingOn() = setOf(target)
 }
 
 class AssassinCharacter(id: Int) : Character(id) {

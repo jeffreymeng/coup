@@ -17,6 +17,7 @@ class TaxAction(actor: Player) : Action(actor) {
         assert(payload == null)
         actor.coins += 3
     }
+
 }
 
 class DukeCharacter(id: Int) : Character(id) {

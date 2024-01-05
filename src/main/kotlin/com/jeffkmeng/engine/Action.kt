@@ -35,7 +35,12 @@ abstract class Action(public val actor: Player) {
      */
     abstract fun resolve(state: State, payload: ActionPayload?)
 
-    open fun getResolveWaitingOn() = setOf<Player>()
+    /**
+     * Returns the set of players who must respond for the action to resolve.
+     * The default behavior is to return an empty set, which implies the action can be resolved immediately without any
+     * player intervention.
+     */
+    open fun getResolveWaitingOn(): Set<Player> = emptySet()
 }
 
 interface TargetedAction {

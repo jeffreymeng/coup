@@ -60,32 +60,32 @@ abstract class State {
 /**
  * State where the current player is choosing which action to perform.
  */
-data class SelectActionState(
+data class SelectActionState private constructor(
     override val players: List<Player>,
     override val deck: List<Character>,
     override val turn: Int,
     override val currentTurnPlayer: Player
 ) : State() {
+    override val waitingOn = setOf(currentTurnPlayer)
+
     companion object {
         fun create(players: List<Player>, deck: List<Character>, turn: Int, currentTurnPlayer: Player) =
             SelectActionState(players, deck, turn, currentTurnPlayer)
     }
-
-    override val waitingOn = setOf(currentTurnPlayer)
 
     override fun receiveMessage(message: Message): State {
         if (message !is SelectActionMessage) {
             throw IllegalMessageException("Expected only a SelectActionEvent!")
         }
         message.action.actor.coins -= message.action.cost
-        return ChallengeState(players, deck, turn, currentTurnPlayer, message.action)
+        return ChallengeState.create(players, deck, turn, currentTurnPlayer, message.action)
     }
 }
 
 /**
  * State where a player must select a card to lose.
  */
-data class SelectCardDeathState(
+data class SelectCardDeathState private constructor(
     override val players: List<Player>,
     override val deck: List<Character>,
     override val turn: Int,
@@ -96,10 +96,13 @@ data class SelectCardDeathState(
      */
     val player: Player,
     /**
-     * The state to continue to after this one (since this state can occur in between various states).
+     * A function that returns the state to continue to after this one (since this state can occur in between various
+     * states). (this avoids updating the log until it's time to move on).
      */
-    val nextState: State
+    val nextStateFactory: () -> State
 ) : State() {
+    override val waitingOn = setOf(currentTurnPlayer)
+
     companion object {
         fun create(
             players: List<Player>,
@@ -108,16 +111,26 @@ data class SelectCardDeathState(
             currentTurnPlayer: Player,
             currentTurnAction: Action,
             player: Player,
-            nextState: State
+            nextStateFactory: () -> State
         ): State {
-            // TODO: if the player to lose a card has only one card to lose, automatically kill it for them
-            // and then return WhateverTheNextStateIs.create()
-            return SelectCardDeathState(players, deck, turn, currentTurnPlayer, currentTurnAction, player, nextState)
+            return if (player.liveCards.size == 1) {
+                // if the player has only one card, kill it automatically
+                player.liveCards.first().isAlive = false
+                nextStateFactory()
+            } else {
+                SelectCardDeathState(
+                    players,
+                    deck,
+                    turn,
+                    currentTurnPlayer,
+                    currentTurnAction,
+                    player,
+                    nextStateFactory
+                )
+            }
         }
 
     }
-
-    override val waitingOn = setOf(currentTurnPlayer)
 
     override fun receiveMessage(message: Message): State {
         if (message !is SelectCardDeathMessage || player != message.player) {
@@ -131,14 +144,14 @@ data class SelectCardDeathState(
         }
 
         card.isAlive = false
-        return nextState
+        return nextStateFactory()
     }
 }
 
 /**
  * State where players are deciding whether to challenge the action.
  */
-data class ChallengeState(
+data class ChallengeState private constructor(
     override val players: List<Player>,
     override val deck: List<Character>,
     override val turn: Int,
@@ -146,6 +159,22 @@ data class ChallengeState(
     val currentTurnAction: Action,
     override val waitingOn: Set<Player> = players.toSet()
 ) : State() {
+    companion object {
+        fun create(
+            players: List<Player>,
+            deck: List<Character>,
+            turn: Int,
+            currentTurnPlayer: Player,
+            currentTurnAction: Action,
+            waitingOn: Set<Player> = players.toSet()
+        ): State {
+            if (currentTurnAction.canBeChallenged) {
+                return ChallengeState(players, deck, turn, currentTurnPlayer, currentTurnAction, waitingOn)
+            } else {
+                return BlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            }
+        }
+    }
 
     override fun receiveMessage(message: Message): State {
         if (message !is ChallengeDecisionMessage) {
@@ -154,31 +183,27 @@ data class ChallengeState(
         // A player can still resubmit the message to challenge if they've previously decided not to challenge,
         // so there's no need to do any validation. (However, once the last player has declined a challenge, the
         // game will move on).
-        return if (message.isChallenging) {
-            if (currentTurnAction.isLegitimate()) {
-                // the challenger has lost the challenge
-                SelectCardDeathState(
-                    players, deck, turn, currentTurnPlayer, currentTurnAction,
-                    message.player,
-                    this.copy(waitingOn = waitingOn - message.player)
-                )
+        if (message.isChallenging) {
+            return if (currentTurnAction.isLegitimate()) {
+                // the challenger has lost the challenge, so after this we can move on
+                BlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
             } else {
-                // the challenger has won the challenge
-                SelectCardDeathState(
+                // the challenger has won the challenge, so after this we skip the rest of the action
+                SelectCardDeathState.create(
                     players, deck, turn, currentTurnPlayer, currentTurnAction,
-                    currentTurnPlayer,
-                    SelectActionState(players, deck, turn + 1, players.getAfter(currentTurnPlayer))
-                )
+                    currentTurnPlayer
+                ) { SelectActionState.create(players, deck, turn + 1, players.getAfter(currentTurnPlayer)) }
             }
         } else {
             val newWaitingOn = waitingOn - message.player
-            if (newWaitingOn.isEmpty()) {
-                BlockState(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            return if (newWaitingOn.isEmpty()) {
+                BlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
             } else {
                 this.copy(waitingOn = newWaitingOn)
             }
         }
     }
+
 }
 
 
@@ -188,44 +213,113 @@ data class ChallengeState(
  * and then block an action, but you can't block and then challenge (ie blocking implicitly accepts the
  * legitimacy of the action)
  */
-data class BlockState(
+data class BlockState private constructor(
     override val players: List<Player>,
     override val deck: List<Character>,
     override val turn: Int,
     override val currentTurnPlayer: Player,
     val currentTurnAction: Action,
-) : State() {
-    // wait on all players, but expect clients to auto-move for the non-targeted players
     override val waitingOn: Set<Player> = players.toSet()
+) : State() {
+
+    companion object {
+        fun create(
+            players: List<Player>,
+            deck: List<Character>,
+            turn: Int,
+            currentTurnPlayer: Player,
+            currentTurnAction: Action
+        ): State {
+            return if (currentTurnAction.canBeBlocked) {
+                BlockState(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            } else {
+                ResolveState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            }
+        }
+    }
 
     override fun receiveMessage(message: Message): State {
-        TODO()
+        if (message !is BlockDecisionMessage) {
+            throw IllegalMessageException("Expected only a ChallengeDecisionEvent!")
+        }
+
+        if (message.isBlocking) {
+            return ChallengeBlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+        } else {
+            val newWaitingOn = waitingOn - message.player
+            return if (newWaitingOn.isEmpty()) {
+                ResolveState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            } else {
+                this.copy(waitingOn = newWaitingOn)
+            }
+        }
     }
 }
 
 /**
  * State where Players are deciding whether to challenge the block
  */
-data class ChallengeBlockState(
+data class ChallengeBlockState private constructor(
     override val players: List<Player>,
     override val deck: List<Character>,
     override val turn: Int,
     override val currentTurnPlayer: Player,
     val currentTurnAction: Action,
-) : State() {
-    // wait on all players, but expect clients to auto-move for the non-targeted players
     override val waitingOn: Set<Player> = players.toSet()
+) : State() {
+    companion object {
+        fun create(
+            players: List<Player>,
+            deck: List<Character>,
+            turn: Int,
+            currentTurnPlayer: Player,
+            currentTurnAction: Action
+        ): ChallengeBlockState {
+            assert(currentTurnAction.canBeBlocked) { "ChallengeBlock constructed on an action that can't be blocked." }
+            return ChallengeBlockState(players, deck, turn, currentTurnPlayer, currentTurnAction)
+        }
+
+    }
 
     override fun receiveMessage(message: Message): State {
-        TODO()
+        if (message !is ChallengeBlockDecisionMessage) {
+            throw IllegalMessageException("Expected only a ChallengeDecisionEvent!")
+        }
+        // TODO: try to get this code and the challenge code into one?? and merge ChallengeBlockDecisionMessage
+        //  into ChallengeDecisionMessage
+        if (message.isChallenging) {
+            TODO() // from here on
+            return if (currentTurnAction.isLegitimate()) {
+                // the challenger has lost the challenge
+                SelectCardDeathState.create(
+                    players, deck, turn, currentTurnPlayer, currentTurnAction,
+                    message.player
+                ) { this.copy(waitingOn = waitingOn - message.player) }
+            } else {
+                // the challenger has won the challenge
+                SelectCardDeathState.create(
+                    players, deck, turn, currentTurnPlayer, currentTurnAction,
+                    currentTurnPlayer
+                ) { SelectActionState.create(players, deck, turn + 1, players.getAfter(currentTurnPlayer)) }
+            }
+        } else {
+            val newWaitingOn = waitingOn - message.player
+            return if (newWaitingOn.isEmpty()) {
+                BlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            } else {
+                this.copy(waitingOn = newWaitingOn)
+            }
+        }
     }
+
+}
 }
 
 /**
  * State where the affected player is deciding how to resolve the action
  * (e.g. choosing a card to lose to assassin, etc.)
  */
-data class ResolveState(
+data class ResolveState private constructor(
     override val players: List<Player>,
     override val deck: List<Character>,
     override val turn: Int,
@@ -234,6 +328,22 @@ data class ResolveState(
 ) : State() {
     // wait on all players, but expect clients to auto-move for the non-targeted players
     override val waitingOn: Set<Player> = setOf(currentTurnPlayer)
+
+    companion object {
+        fun create(
+            players: List<Player>,
+            deck: List<Character>,
+            turn: Int,
+            currentTurnPlayer: Player,
+            currentTurnAction: Action
+        ): State {
+            if (currentTurnAction.getResolveWaitingOn().isEmpty()) {
+                TODO() // createAction
+            } else {
+                return ResolveState(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            }
+        }
+    }
 
     override fun receiveMessage(message: Message): State {
         TODO()
