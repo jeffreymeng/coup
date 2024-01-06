@@ -85,23 +85,18 @@ class EngineTest {
         // Alice should have gotten the money from the Duke
         assertEquals(5, alice.coins)
 
-        /* TODO -- make below tests work (if there are errors double check to make sure the tests are right first)
-
-        // Now it is bob's turn
+        // Now it is Bob's turn
         assertIs<SelectActionState>(game.state)
         assertEquals(bob, game.state.currentTurnPlayer)
         assertEquals(setOf(bob), game.state.waitingOn)
 
         // Bob selects tax
-        game.receiveMessage(SelectActionMessage(TaxAction(alice)))
+        game.receiveMessage(SelectActionMessage(TaxAction(bob)))
         assertIs<ChallengeState>(game.state)
 
         // Alice declines to challenge, so Bob's duke is automatically executed
         game.receiveMessage(ChallengeDecisionMessage(alice, false))
         assertIs<SelectActionState>(game.state)
         assertEquals(5, bob.coins)
-
-         */
-
     }
 }

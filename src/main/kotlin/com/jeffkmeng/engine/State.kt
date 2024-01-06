@@ -76,7 +76,10 @@ data class SelectActionState private constructor(
 
     override fun receiveMessage(message: Message): State {
         if (message !is SelectActionMessage) {
-            throw IllegalMessageException("Expected only a SelectActionEvent!")
+            throw IllegalMessageException("Expected only a SelectActionMessage!")
+        }
+        if (message.action.actor != currentTurnPlayer) {
+            throw IllegalMessageException("Expected SelectActionMessage's actor to be the current player")
         }
         message.action.actor.coins -= message.action.cost
         return ChallengeState.create(players, deck, turn, currentTurnPlayer, message.action)
