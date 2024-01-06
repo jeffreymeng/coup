@@ -38,8 +38,8 @@ class UIHiddenCharacter(isAlive: Boolean) : UICharacter(isAlive) {
     override fun toString() = "UIHiddenCharacter(${if (isAlive) "alive" else "not alive"})"
 }
 
-data class UIPlayer(val user: User, val cards: List<UICharacter>) {
-    override fun toString() = "UIPlayer(${user.name}, ${cards.map { it.toString() }})"
+data class UIPlayer(val user: User, val cards: List<UICharacter>, val coins: Int) {
+    override fun toString() = "UIPlayer(${user.name}, ${cards.map { it.toString() }}, $coins)"
 }
 
 
@@ -66,7 +66,8 @@ class UIState(val forUser: User, val players: List<UIPlayer>) {
         players.map { player ->
             UIPlayer(
                 player.user,
-                player.cards.map { if (player == forPlayer) UIVisibleCharacter(it) else UIHiddenCharacter.from(it) }
+                player.cards.map { if (player == forPlayer) UIVisibleCharacter(it) else UIHiddenCharacter.from(it) },
+                player.coins
             )
         }
     ) {

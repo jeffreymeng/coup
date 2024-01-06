@@ -31,15 +31,15 @@ class EngineTest {
         var aliceState = UIState(
             uAlice,
             listOf(
-                UIPlayer(uAlice, dukesBetween(0, 1)),
-                UIPlayer(uBob, hiddenCharacters(true, true))
+                UIPlayer(uAlice, dukesBetween(0, 1), 2),
+                UIPlayer(uBob, hiddenCharacters(true, true), 2)
             )
         )
         var bobState = UIState(
             uBob,
             listOf(
-                UIPlayer(uAlice, hiddenCharacters(true, true)),
-                UIPlayer(uBob, dukesBetween(2, 3))
+                UIPlayer(uAlice, hiddenCharacters(true, true), 2),
+                UIPlayer(uBob, dukesBetween(2, 3), 2)
             )
         )
         // initially, alice must select an action
@@ -68,24 +68,24 @@ class EngineTest {
         aliceState = UIState(
             uAlice,
             listOf(
-                UIPlayer(uAlice, listOf(createLiveDuke(0), createLiveDuke(1))),
-                UIPlayer(uBob, hiddenCharacters(false, true))
+                UIPlayer(uAlice, listOf(createLiveDuke(0), createLiveDuke(1)), 5),
+                UIPlayer(uBob, hiddenCharacters(false, true), 2)
             )
         )
         bobState = UIState(
             uBob,
             listOf(
-                UIPlayer(uAlice, hiddenCharacters(true, true)),
-                UIPlayer(uBob, listOf(createDeadDuke(2), createLiveDuke(3)))
+                UIPlayer(uAlice, hiddenCharacters(true, true), 5),
+                UIPlayer(uBob, listOf(createDeadDuke(2), createLiveDuke(3)), 2)
             )
         )
         assertEquals(aliceState, game.getUIState(uAlice))
         assertEquals(bobState, game.getUIState(uBob))
 
-        /* TODO -- make below tests work (if there are errors double check to make sure the tests are right first)
-
         // Alice should have gotten the money from the Duke
         assertEquals(5, alice.coins)
+
+        /* TODO -- make below tests work (if there are errors double check to make sure the tests are right first)
 
         // Now it is bob's turn
         assertIs<SelectActionState>(game.state)
