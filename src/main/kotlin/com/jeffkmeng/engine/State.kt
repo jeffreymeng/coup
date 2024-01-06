@@ -386,6 +386,6 @@ data class ResolveState private constructor(
     }
 
     override fun receiveMessage(message: Message): State {
-        TODO()
+        TODO() // wait for a message specific to the action we're expecting (for ambassador only, for assassin we can use SelectCardDeathState again)
     }
 }
