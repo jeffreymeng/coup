@@ -9,7 +9,6 @@ import com.jeffkmeng.UIState
  */
 fun <T> List<T>.getAfter(el: T): T = this[(this.indexOf(el) + 1) % this.size]
 
-
 /**
  * All the information for the current game state
  */
@@ -54,6 +53,8 @@ abstract class State {
     fun getUIState(player: Player): UIState {
         return UIState(player.cards)
     }
+
+    fun createNextTurnState() = SelectActionState.create(players, deck, turn + 1, players.getAfter(currentTurnPlayer))
 }
 
 
@@ -150,6 +151,8 @@ data class SelectCardDeathState private constructor(
 
 /**
  * State where players are deciding whether to challenge the action.
+ * @property mode - Whether the challenge is for an Action (e.g. challenging a duke's tax action) or for a Block (e.g.
+ * challenging the block of stealing by an ambassador, etc.).
  */
 data class ChallengeState private constructor(
     override val players: List<Player>,
@@ -157,7 +160,7 @@ data class ChallengeState private constructor(
     override val turn: Int,
     override val currentTurnPlayer: Player,
     val currentTurnAction: Action,
-    override val waitingOn: Set<Player> = players.toSet()
+    override val waitingOn: Set<Player> = players.toSet(),
 ) : State() {
     companion object {
         fun create(
@@ -168,10 +171,10 @@ data class ChallengeState private constructor(
             currentTurnAction: Action,
             waitingOn: Set<Player> = players.toSet()
         ): State {
-            if (currentTurnAction.canBeChallenged) {
-                return ChallengeState(players, deck, turn, currentTurnPlayer, currentTurnAction, waitingOn)
-            } else {
+            if (!currentTurnAction.canBeChallenged) {
                 return BlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            } else {
+                return ChallengeState(players, deck, turn, currentTurnPlayer, currentTurnAction, waitingOn)
             }
         }
     }
@@ -191,8 +194,8 @@ data class ChallengeState private constructor(
                 // the challenger has won the challenge, so after this we skip the rest of the action
                 SelectCardDeathState.create(
                     players, deck, turn, currentTurnPlayer, currentTurnAction,
-                    currentTurnPlayer
-                ) { SelectActionState.create(players, deck, turn + 1, players.getAfter(currentTurnPlayer)) }
+                    currentTurnPlayer, ::createNextTurnState
+                )
             }
         } else {
             val newWaitingOn = waitingOn - message.player
@@ -219,7 +222,7 @@ data class BlockState private constructor(
     override val turn: Int,
     override val currentTurnPlayer: Player,
     val currentTurnAction: Action,
-    override val waitingOn: Set<Player> = players.toSet()
+    override val waitingOn: Set<Player> = players.toSet(),
 ) : State() {
 
     companion object {
@@ -228,10 +231,11 @@ data class BlockState private constructor(
             deck: List<Character>,
             turn: Int,
             currentTurnPlayer: Player,
-            currentTurnAction: Action
+            currentTurnAction: Action,
+            waitingOn: Set<Player> = players.toSet()
         ): State {
-            return if (currentTurnAction.canBeBlocked) {
-                BlockState(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            return if (currentTurnAction.canBeBlocked && waitingOn.isNotEmpty()) {
+                BlockState(players, deck, turn, currentTurnPlayer, currentTurnAction, waitingOn)
             } else {
                 ResolveState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
             }
@@ -240,12 +244,25 @@ data class BlockState private constructor(
 
     override fun receiveMessage(message: Message): State {
         if (message !is BlockDecisionMessage) {
-            throw IllegalMessageException("Expected only a ChallengeDecisionEvent!")
+            throw IllegalMessageException("Expected only a BlockDecisionMessage!")
         }
 
         if (message.isBlocking) {
-            return ChallengeBlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            if (message.blockingCharacter == null) {
+                throw IllegalMessageException("Expected a blockingCharacter to be defined when isBlocking is true")
+            }
+            return ChallengeBlockState.create(
+                players,
+                deck,
+                turn,
+                currentTurnPlayer,
+                currentTurnAction,
+                message.blockingCharacter
+            )
         } else {
+            if (message.blockingCharacter != null) {
+                throw IllegalMessageException("Expected blockingCharacter to be null when isBlocking is false")
+            }
             val newWaitingOn = waitingOn - message.player
             return if (newWaitingOn.isEmpty()) {
                 ResolveState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
@@ -265,6 +282,7 @@ data class ChallengeBlockState private constructor(
     override val turn: Int,
     override val currentTurnPlayer: Player,
     val currentTurnAction: Action,
+    val blockingWith: Character,
     override val waitingOn: Set<Player> = players.toSet()
 ) : State() {
     companion object {
@@ -273,34 +291,42 @@ data class ChallengeBlockState private constructor(
             deck: List<Character>,
             turn: Int,
             currentTurnPlayer: Player,
-            currentTurnAction: Action
+            currentTurnAction: Action,
+            blockingWith: Character,
         ): ChallengeBlockState {
             assert(currentTurnAction.canBeBlocked) { "ChallengeBlock constructed on an action that can't be blocked." }
-            return ChallengeBlockState(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            return ChallengeBlockState(players, deck, turn, currentTurnPlayer, currentTurnAction, blockingWith)
         }
 
     }
 
     override fun receiveMessage(message: Message): State {
-        if (message !is ChallengeBlockDecisionMessage) {
-            throw IllegalMessageException("Expected only a ChallengeDecisionEvent!")
+        if (message !is ChallengeDecisionMessage) { // the same message is used for BlockChallenge
+            throw IllegalMessageException("Expected only a ChallengeDecisionMessage!")
         }
-        // TODO: try to get this code and the challenge code into one?? and merge ChallengeBlockDecisionMessage
-        //  into ChallengeDecisionMessage
         if (message.isChallenging) {
-            TODO() // from here on
-            return if (currentTurnAction.isLegitimate()) {
-                // the challenger has lost the challenge
+            return if (currentTurnAction.canBeBlockedBy(currentTurnPlayer, blockingWith)) {
+                // the challenger has lost the challenge -- the action is cancelled
                 SelectCardDeathState.create(
                     players, deck, turn, currentTurnPlayer, currentTurnAction,
-                    message.player
-                ) { this.copy(waitingOn = waitingOn - message.player) }
+                    message.player, ::createNextTurnState
+                )
             } else {
-                // the challenger has won the challenge
+                // the blocker has lost the challenge -- others may still block
+                // (if waitingOn is empty after this block, the game will immediately proceed)
                 SelectCardDeathState.create(
                     players, deck, turn, currentTurnPlayer, currentTurnAction,
                     currentTurnPlayer
-                ) { SelectActionState.create(players, deck, turn + 1, players.getAfter(currentTurnPlayer)) }
+                ) {
+                    BlockState.create(
+                        players,
+                        deck,
+                        turn + 1,
+                        players.getAfter(currentTurnPlayer),
+                        currentTurnAction,
+                        waitingOn = waitingOn - message.player
+                    )
+                }
             }
         } else {
             val newWaitingOn = waitingOn - message.player
@@ -338,7 +364,8 @@ data class ResolveState private constructor(
             currentTurnAction: Action
         ): State {
             if (currentTurnAction.getResolveWaitingOn().isEmpty()) {
-                TODO() // createAction
+                TODO() // perform the action
+
             } else {
                 return ResolveState(players, deck, turn, currentTurnPlayer, currentTurnAction)
             }

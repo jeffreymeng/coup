@@ -30,6 +30,9 @@ abstract class Action(public val actor: Player) {
     fun isLegitimate(): Boolean =
         actor.liveCards.flatMap { it.actions }.any { this::class == it.reference }
 
+    fun canBeBlockedBy(player: Player, card: Character): Boolean =
+        this in card.blockedActions && card in player.liveCards
+
     /**
      * Performs the action, mutating state as necessary.
      */

@@ -22,5 +22,5 @@ class TaxAction(actor: Player) : Action(actor) {
 
 class DukeCharacter(id: Int) : Character(id) {
     override val actions: List<ActionManifest> = listOf(TaxAction.MANIFEST)
-    override val blockedActions: List<Action> = listOf()
+    override val blockedActions: Set<Action> = setOf()
 }

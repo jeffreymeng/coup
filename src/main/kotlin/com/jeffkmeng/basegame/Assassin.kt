@@ -37,5 +37,5 @@ class AssassinateAction(actor: Player, override val target: Player) : Action(act
 
 class AssassinCharacter(id: Int) : Character(id) {
     override val actions: List<ActionManifest> = listOf(AssassinateAction.MANIFEST)
-    override val blockedActions: List<Action> = listOf()
+    override val blockedActions: Set<Action> = emptySet()
 }
