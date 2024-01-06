@@ -1,8 +1,8 @@
 package com.jeffkmeng.history
 
 import com.jeffkmeng.engine.Player
-import kotlinx.serialization.Serializable
 
+// TODO: 
 class History : Iterable<HistoryEvent> {
     private val entries: MutableList<HistoryEvent> = mutableListOf()
     override fun iterator(): Iterator<HistoryEvent> = entries.iterator()
@@ -19,8 +19,8 @@ abstract class HistoryEvent {
     abstract fun message(): String
 }
 
-//@Serializable // TODO -- we don't really need serialization, just to export it as json somehow (e.g. export to map
-// then serialize the map
+//@Serializable // TODO -- we don't really need serialization (since we don't need DEserialization which is the more
+// complicated part), so we could also just export it as json somehow (e.g. export to map and then serialize that)
 class TurnChangeEvent(val player: Player): HistoryEvent() {
     override fun message() = "It is now ${player.user.name}'s turn."
 }

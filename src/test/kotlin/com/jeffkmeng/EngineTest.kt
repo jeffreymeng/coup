@@ -57,7 +57,7 @@ class EngineTest {
         game.receiveMessage(ChallengeDecisionMessage(bob, true))
         assertIs<SelectCardDeathState>(game.state)
         assertEquals(setOf(bob), game.state.waitingOn)
-        /* TODO -- make below tests work
+        /* TODO -- make below tests work (if there are errors double check to make sure the tests are right first)
 
         // Bob chooses to lost his first duke
         game.receiveMessage(SelectCardDeathMessage(bob, 0))
