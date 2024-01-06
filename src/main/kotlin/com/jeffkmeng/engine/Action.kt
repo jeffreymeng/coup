@@ -54,6 +54,5 @@ interface TargetedAction {
 data class ActionManifest(
     val name: String,
     val description: String,
-    val reference: KClass<out Action>,
-//    val isTargeted: Boolean = reference.isSubclassOf(TargetedAction::class) // TODO fix if broken
+    val reference: KClass<out Action>
 )

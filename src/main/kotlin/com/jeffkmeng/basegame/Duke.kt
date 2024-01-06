@@ -3,7 +3,7 @@ package com.jeffkmeng.basegame
 import com.jeffkmeng.engine.*
 
 class TaxAction(actor: Player) : Action(actor) {
-    override val canBeBlocked = true
+    override val canBeBlocked = false
     override val canBeChallenged = true
 
     companion object {

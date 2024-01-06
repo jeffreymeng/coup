@@ -4,10 +4,12 @@ import com.jeffkmeng.*
 
 
 open class Engine(
+    /**
+     * The list of users, **in the order they should be given turns during the game**.
+     */
     val users: List<User>,
     /**
-     * The deck containing the initial characters of the variant.
-     * Note that the initialDeck is expected to be pre-shuffled.
+     * The deck containing the initial characters of the variant, **in a pre-shuffled order**.
      */
     initialDeck: List<Character>,
     /**
@@ -31,7 +33,7 @@ open class Engine(
         val cards = initialDeck.iterator()
         val players = users.map { Player(it, List(2) { cards.next() }) }
         val deck = cards.asSequence().toList()
-        state = SelectActionState.create(players, deck, 1, players.random())
+        state = SelectActionState.create(players, deck, 1, players.first())
     }
 
 

@@ -51,7 +51,7 @@ abstract class State {
      * Returns the UI state for a given player.
      */
     fun getUIState(player: Player): UIState {
-        return UIState(player.cards)
+        return UIState(player, players)
     }
 
     fun createNextTurnState() = SelectActionState.create(players, deck, turn + 1, players.getAfter(currentTurnPlayer))
@@ -95,14 +95,14 @@ data class SelectCardDeathState private constructor(
     /**
      * The player who must lose a card.
      */
-    val player: Player,
+    val target: Player,
     /**
      * A function that returns the state to continue to after this one (since this state can occur in between various
      * states). (this avoids updating the log until it's time to move on).
      */
     val nextStateFactory: () -> State
 ) : State() {
-    override val waitingOn = setOf(currentTurnPlayer)
+    override val waitingOn = setOf(target)
 
     companion object {
         fun create(
@@ -111,12 +111,12 @@ data class SelectCardDeathState private constructor(
             turn: Int,
             currentTurnPlayer: Player,
             currentTurnAction: Action,
-            player: Player,
+            target: Player,
             nextStateFactory: () -> State
         ): State {
-            return if (player.liveCards.size == 1) {
+            return if (target.liveCards.size == 1) {
                 // if the player has only one card, kill it automatically
-                player.liveCards.first().isAlive = false
+                target.liveCards.first().isAlive = false
                 nextStateFactory()
             } else {
                 SelectCardDeathState(
@@ -125,7 +125,7 @@ data class SelectCardDeathState private constructor(
                     turn,
                     currentTurnPlayer,
                     currentTurnAction,
-                    player,
+                    target,
                     nextStateFactory
                 )
             }
@@ -134,8 +134,8 @@ data class SelectCardDeathState private constructor(
     }
 
     override fun receiveMessage(message: Message): State {
-        if (message !is SelectCardDeathMessage || player != message.player) {
-            throw IllegalMessageException("Expected only a SelectCardDeathEvent by $player!")
+        if (message !is SelectCardDeathMessage || target != message.player) {
+            throw IllegalMessageException("Expected only a SelectCardDeathEvent by $target!")
         }
         val card = message.player.cards.getOrNull(message.cardIndex)
             ?: throw InvalidMessageException("The selected card is not part of the player's list of characters")
@@ -160,7 +160,7 @@ data class ChallengeState private constructor(
     override val turn: Int,
     override val currentTurnPlayer: Player,
     val currentTurnAction: Action,
-    override val waitingOn: Set<Player> = players.toSet(),
+    override val waitingOn: Set<Player> = players.toSet() - currentTurnPlayer,
 ) : State() {
     companion object {
         fun create(
@@ -169,7 +169,7 @@ data class ChallengeState private constructor(
             turn: Int,
             currentTurnPlayer: Player,
             currentTurnAction: Action,
-            waitingOn: Set<Player> = players.toSet()
+            waitingOn: Set<Player> = players.toSet() - currentTurnPlayer
         ): State {
             if (!currentTurnAction.canBeChallenged) {
                 return BlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
@@ -183,19 +183,22 @@ data class ChallengeState private constructor(
         if (message !is ChallengeDecisionMessage) {
             throw IllegalMessageException("Expected only a ChallengeDecisionEvent!")
         }
+
         // A player can still resubmit the message to challenge if they've previously decided not to challenge,
         // so there's no need to do any validation. (However, once the last player has declined a challenge, the
         // game will move on).
         if (message.isChallenging) {
             return if (currentTurnAction.isLegitimate()) {
                 // the challenger has lost the challenge, so after this we can move on
-                BlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+                SelectCardDeathState.create(
+                    players, deck, turn, currentTurnPlayer, currentTurnAction, target = message.player
+                ) { BlockState.create(players, deck, turn, currentTurnPlayer, currentTurnAction) }
+
             } else {
                 // the challenger has won the challenge, so after this we skip the rest of the action
                 SelectCardDeathState.create(
-                    players, deck, turn, currentTurnPlayer, currentTurnAction,
-                    currentTurnPlayer, ::createNextTurnState
-                )
+                    players, deck, turn, currentTurnPlayer, currentTurnAction, target = currentTurnPlayer
+                ) { createNextTurnState() }
             }
         } else {
             val newWaitingOn = waitingOn - message.player
@@ -222,7 +225,7 @@ data class BlockState private constructor(
     override val turn: Int,
     override val currentTurnPlayer: Player,
     val currentTurnAction: Action,
-    override val waitingOn: Set<Player> = players.toSet(),
+    override val waitingOn: Set<Player> = players.toSet() - currentTurnPlayer,
 ) : State() {
 
     companion object {
@@ -232,7 +235,7 @@ data class BlockState private constructor(
             turn: Int,
             currentTurnPlayer: Player,
             currentTurnAction: Action,
-            waitingOn: Set<Player> = players.toSet()
+            waitingOn: Set<Player> = players.toSet() - currentTurnPlayer
         ): State {
             return if (currentTurnAction.canBeBlocked && waitingOn.isNotEmpty()) {
                 BlockState(players, deck, turn, currentTurnPlayer, currentTurnAction, waitingOn)
@@ -257,6 +260,7 @@ data class BlockState private constructor(
                 turn,
                 currentTurnPlayer,
                 currentTurnAction,
+                message.player,
                 message.blockingCharacter
             )
         } else {
@@ -282,8 +286,9 @@ data class ChallengeBlockState private constructor(
     override val turn: Int,
     override val currentTurnPlayer: Player,
     val currentTurnAction: Action,
+    val blockingPlayer: Player,
     val blockingWith: Character,
-    override val waitingOn: Set<Player> = players.toSet()
+    override val waitingOn: Set<Player> = players.toSet() - blockingPlayer
 ) : State() {
     companion object {
         fun create(
@@ -292,10 +297,19 @@ data class ChallengeBlockState private constructor(
             turn: Int,
             currentTurnPlayer: Player,
             currentTurnAction: Action,
+            blockingPlayer: Player,
             blockingWith: Character,
         ): ChallengeBlockState {
             assert(currentTurnAction.canBeBlocked) { "ChallengeBlock constructed on an action that can't be blocked." }
-            return ChallengeBlockState(players, deck, turn, currentTurnPlayer, currentTurnAction, blockingWith)
+            return ChallengeBlockState(
+                players,
+                deck,
+                turn,
+                currentTurnPlayer,
+                currentTurnAction,
+                blockingPlayer,
+                blockingWith
+            )
         }
 
     }
@@ -309,14 +323,14 @@ data class ChallengeBlockState private constructor(
                 // the challenger has lost the challenge -- the action is cancelled
                 SelectCardDeathState.create(
                     players, deck, turn, currentTurnPlayer, currentTurnAction,
-                    message.player, ::createNextTurnState
+                    target = message.player, ::createNextTurnState
                 )
             } else {
                 // the blocker has lost the challenge -- others may still block
                 // (if waitingOn is empty after this block, the game will immediately proceed)
                 SelectCardDeathState.create(
                     players, deck, turn, currentTurnPlayer, currentTurnAction,
-                    currentTurnPlayer
+                    target = currentTurnPlayer
                 ) {
                     BlockState.create(
                         players,
@@ -338,7 +352,6 @@ data class ChallengeBlockState private constructor(
         }
     }
 
-}
 }
 
 /**

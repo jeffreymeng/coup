@@ -11,10 +11,16 @@ class Player(val user: User, var cards: List<Character>) {
     val liveCards: List<Character>
         get() = cards.filter { it.isAlive }
 
-    // TODO: Note: with the current implementation, this can't be a data class since we need equality of players
-    // to be referential, otherwise it wouldn't make sense to update the cards value
 
     override fun toString(): String {
-        return "Player(id = $user.id)"
+        return "Player(uid = ${user.id})"
+    }
+
+    override fun equals(other: Any?): Boolean {
+        return other is Player && this.user == other.user
+    }
+
+    override fun hashCode(): Int {
+        return this.user.hashCode()
     }
 }
