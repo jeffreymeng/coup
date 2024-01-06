@@ -34,7 +34,8 @@ abstract class Action(public val actor: Player) {
         this in card.blockedActions && card in player.liveCards
 
     /**
-     * Performs the action, mutating state as necessary.
+     * Performs the action and returns the next game state.
+     * This function *may* mutate the state that's passed in.
      */
     abstract fun resolve(state: State, payload: ActionPayload?)
 

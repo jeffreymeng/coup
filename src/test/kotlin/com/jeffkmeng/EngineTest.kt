@@ -7,9 +7,13 @@ import kotlin.test.*
 
 
 class EngineTest {
-    fun hiddenCharacters(count: Int) = List(count) { UIHiddenCharacter(true) }
-    fun createLiveDuke(id: Int) = UIVisibleCharacter.from(DukeCharacter(id))
-    fun createDeadDuke(id: Int) = UIVisibleCharacter(false, DukeCharacter(id))
+    fun hiddenCharacters(vararg isAlive: Boolean) = isAlive.map { UIHiddenCharacter(it) }
+    fun createLiveDuke(id: Int) = UIVisibleCharacter(DukeCharacter(id))
+    fun createDeadDuke(id: Int): UIVisibleCharacter {
+        val duke = DukeCharacter(id)
+        duke.isAlive = false
+        return UIVisibleCharacter(duke)
+    }
     fun dukesBetween(rangeStart: Int, rangeEnd: Int) = (rangeStart..rangeEnd).map(::createLiveDuke)
 
     @Test
@@ -28,13 +32,13 @@ class EngineTest {
             uAlice,
             listOf(
                 UIPlayer(uAlice, dukesBetween(0, 1)),
-                UIPlayer(uBob, hiddenCharacters(2))
+                UIPlayer(uBob, hiddenCharacters(true, true))
             )
         )
         var bobState = UIState(
             uBob,
             listOf(
-                UIPlayer(uAlice, hiddenCharacters(2)),
+                UIPlayer(uAlice, hiddenCharacters(true, true)),
                 UIPlayer(uBob, dukesBetween(2, 3))
             )
         )
@@ -57,20 +61,28 @@ class EngineTest {
         game.receiveMessage(ChallengeDecisionMessage(bob, true))
         assertIs<SelectCardDeathState>(game.state)
         assertEquals(setOf(bob), game.state.waitingOn)
-        /* TODO -- make below tests work (if there are errors double check to make sure the tests are right first)
 
         // Bob chooses to lost his first duke
         game.receiveMessage(SelectCardDeathMessage(bob, 0))
-        // we expect Bob's state to now be updated
+        // we expect Bob and Alice's state to now be updated
+        aliceState = UIState(
+            uAlice,
+            listOf(
+                UIPlayer(uAlice, listOf(createLiveDuke(0), createLiveDuke(1))),
+                UIPlayer(uBob, hiddenCharacters(false, true))
+            )
+        )
         bobState = UIState(
             uBob,
             listOf(
-                UIPlayer(uAlice, hiddenCharacters(2)),
+                UIPlayer(uAlice, hiddenCharacters(true, true)),
                 UIPlayer(uBob, listOf(createDeadDuke(2), createLiveDuke(3)))
             )
         )
         assertEquals(aliceState, game.getUIState(uAlice))
         assertEquals(bobState, game.getUIState(uBob))
+
+        /* TODO -- make below tests work (if there are errors double check to make sure the tests are right first)
 
         // Alice should have gotten the money from the Duke
         assertEquals(5, alice.coins)

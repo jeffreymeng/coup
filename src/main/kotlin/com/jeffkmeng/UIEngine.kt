@@ -21,11 +21,7 @@ data class User(val id: String, val name: String) {
 }
 
 abstract class UICharacter(val isAlive: Boolean)
-class UIVisibleCharacter(isAlive: Boolean, val character: Character) : UICharacter(character.isAlive) {
-    companion object {
-        fun from(character: Character) = UIVisibleCharacter(character.isAlive, character)
-    }
-
+class UIVisibleCharacter(val character: Character) : UICharacter(character.isAlive) {
     override fun equals(other: Any?): Boolean =
         other is UIVisibleCharacter && other.isAlive == isAlive && other.character == character
 
@@ -70,7 +66,7 @@ class UIState(val forUser: User, val players: List<UIPlayer>) {
         players.map { player ->
             UIPlayer(
                 player.user,
-                player.cards.map { if (player == forPlayer) UIVisibleCharacter.from(it) else UIHiddenCharacter.from(it) }
+                player.cards.map { if (player == forPlayer) UIVisibleCharacter(it) else UIHiddenCharacter.from(it) }
             )
         }
     ) {

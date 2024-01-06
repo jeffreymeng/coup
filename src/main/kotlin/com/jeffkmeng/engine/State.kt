@@ -376,11 +376,13 @@ data class ResolveState private constructor(
             currentTurnPlayer: Player,
             currentTurnAction: Action
         ): State {
-            if (currentTurnAction.getResolveWaitingOn().isEmpty()) {
-                TODO() // perform the action
-
+            val state = ResolveState(players, deck, turn, currentTurnPlayer, currentTurnAction)
+            return if (currentTurnAction.getResolveWaitingOn().isEmpty()) {
+                // the action doesn't require input from players (ex. Tax action)
+                currentTurnAction.resolve(state, null);
+                state.createNextTurnState()
             } else {
-                return ResolveState(players, deck, turn, currentTurnPlayer, currentTurnAction)
+                state
             }
         }
     }
