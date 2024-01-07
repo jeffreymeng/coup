@@ -23,7 +23,7 @@ abstract class Character(val id: Int) {
      * What actions can this character block?
      * Ex. Duke can block Foreign Aid
      */
-    abstract val blockedActions: Set<Action>
+    abstract val blockedActions: Set<ActionManifest>
 
     override fun equals(other: Any?): Boolean {
         return other is Character && other.id == id

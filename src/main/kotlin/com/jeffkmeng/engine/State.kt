@@ -2,7 +2,6 @@ package com.jeffkmeng.engine
 
 import com.jeffkmeng.UIState
 
-
 /**
  * Returns the element in the position after the given element in the list. If the given element is the last
  * element of the list, then the first element is returned.
@@ -80,6 +79,9 @@ data class SelectActionState private constructor(
         }
         if (message.action.actor != currentTurnPlayer) {
             throw IllegalMessageException("Expected SelectActionMessage's actor to be the current player")
+        }
+        if (message.action.actor.coins < message.action.cost) {
+            throw IllegalMessageException("Current player doesn't have enough money to execute the action")
         }
         message.action.actor.coins -= message.action.cost
         return ChallengeState.create(players, deck, turn, currentTurnPlayer, message.action)
@@ -240,10 +242,11 @@ data class BlockState private constructor(
             currentTurnAction: Action,
             waitingOn: Set<Player> = players.toSet() - currentTurnPlayer
         ): State {
+            val state = BlockState(players, deck, turn, currentTurnPlayer, currentTurnAction, waitingOn)
             return if (currentTurnAction.canBeBlocked && waitingOn.isNotEmpty()) {
-                BlockState(players, deck, turn, currentTurnPlayer, currentTurnAction, waitingOn)
+                state
             } else {
-                ResolveState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+                currentTurnAction.resolve(state)
             }
         }
     }
@@ -272,7 +275,7 @@ data class BlockState private constructor(
             }
             val newWaitingOn = waitingOn - message.player
             return if (newWaitingOn.isEmpty()) {
-                ResolveState.create(players, deck, turn, currentTurnPlayer, currentTurnAction)
+                currentTurnAction.resolve(this)
             } else {
                 this.copy(waitingOn = newWaitingOn)
             }
@@ -321,8 +324,11 @@ data class ChallengeBlockState private constructor(
         if (message !is ChallengeDecisionMessage) { // the same message is used for BlockChallenge
             throw IllegalMessageException("Expected only a ChallengeDecisionMessage!")
         }
+        if (message.player == blockingPlayer) {
+            throw IllegalMessageException("The blocking player cannot challenge his own block")
+        }
         if (message.isChallenging) {
-            return if (currentTurnAction.canBeBlockedBy(currentTurnPlayer, blockingWith)) {
+            return if (currentTurnAction.canBeBlockedBy(blockingPlayer, blockingWith)) {
                 // the challenger has lost the challenge -- the action is cancelled
                 SelectCardDeathState.create(
                     players, deck, turn, currentTurnPlayer, currentTurnAction,
@@ -357,40 +363,40 @@ data class ChallengeBlockState private constructor(
 
 }
 
-/**
- * State where the affected player is deciding how to resolve the action
- * (e.g. choosing a card to lose to assassin, etc.)
- */
-data class ResolveState private constructor(
-    override val players: List<Player>,
-    override val deck: List<Character>,
-    override val turn: Int,
-    override val currentTurnPlayer: Player,
-    val currentTurnAction: Action,
-) : State() {
-    // wait on all players, but expect clients to auto-move for the non-targeted players
-    override val waitingOn: Set<Player> = setOf(currentTurnPlayer)
-
-    companion object {
-        fun create(
-            players: List<Player>,
-            deck: List<Character>,
-            turn: Int,
-            currentTurnPlayer: Player,
-            currentTurnAction: Action
-        ): State {
-            val state = ResolveState(players, deck, turn, currentTurnPlayer, currentTurnAction)
-            return if (currentTurnAction.getResolveWaitingOn().isEmpty()) {
-                // the action doesn't require input from players (ex. Tax action)
-                currentTurnAction.resolve(state, null);
-                state.createNextTurnState()
-            } else {
-                state
-            }
-        }
-    }
-
-    override fun receiveMessage(message: Message): State {
-        TODO() // wait for a message specific to the action we're expecting (for ambassador only, for assassin we can use SelectCardDeathState again)
-    }
-}
+// /**
+//  * State where the affected player is deciding how to resolve the action
+//  * (e.g. choosing a card to lose to assassin, etc.)
+//  */
+// data class ResolveState private constructor(
+//     override val players: List<Player>,
+//     override val deck: List<Character>,
+//     override val turn: Int,
+//     override val currentTurnPlayer: Player,
+//     val currentTurnAction: Action,
+// ) : State() {
+//     // wait on all players, but expect clients to auto-move for the non-targeted players
+//     override val waitingOn: Set<Player> = setOf(currentTurnPlayer)
+//
+//     companion object {
+//         fun create(
+//             players: List<Player>,
+//             deck: List<Character>,
+//             turn: Int,
+//             currentTurnPlayer: Player,
+//             currentTurnAction: Action
+//         ): State {
+//             val state = ResolveState(players, deck, turn, currentTurnPlayer, currentTurnAction)
+//             return if (currentTurnAction.getResolveWaitingOn().isEmpty()) {
+//                 // the action doesn't require input from players (ex. Tax action)
+//                 currentTurnAction.resolve(state, null);
+//                 state.createNextTurnState()
+//             } else {
+//                 state
+//             }
+//         }
+//     }
+//
+//     override fun receiveMessage(message: Message): State {
+//         TODO() // wait for a message specific to the action we're expecting (for ambassador only, for assassin we can use SelectCardDeathState again)
+//     }
+// }

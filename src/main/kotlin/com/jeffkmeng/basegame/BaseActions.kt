@@ -14,7 +14,8 @@ class IncomeAction(actor: Player) : Action(actor) {
     override val id = "income"
 
     override fun isLegal(state: State) = true
-    override fun resolve(state: State, payload: ActionPayload?) {
+    override fun resolve(state: State): State {
         actor.coins += 1
+        return state.createNextTurnState()
     }
 }

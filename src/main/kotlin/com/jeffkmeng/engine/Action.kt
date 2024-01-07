@@ -5,10 +5,6 @@ import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.primaryConstructor
 
-open class ActionPayload {
-
-}
-
 /**
  * Ex. Tax, Income, Foreign Aid, Coup, etc
  */
@@ -31,13 +27,13 @@ abstract class Action(public val actor: Player) {
         actor.liveCards.flatMap { it.actions }.any { this::class == it.reference }
 
     fun canBeBlockedBy(player: Player, card: Character): Boolean =
-        this in card.blockedActions && card in player.liveCards
+        this::class in card.blockedActions.map { it.reference } && card in player.liveCards
 
     /**
      * Performs the action and returns the next game state.
      * This function *may* mutate the state that's passed in.
      */
-    abstract fun resolve(state: State, payload: ActionPayload?)
+    abstract fun resolve(state: State): State
 
     /**
      * Returns the set of players who must respond for the action to resolve.

@@ -13,14 +13,14 @@ class TaxAction(actor: Player) : Action(actor) {
     override val id = "tax"
 
     override fun isLegal(state: State) = true
-    override fun resolve(state: State, payload: ActionPayload?) {
-        assert(payload == null)
+    override fun resolve(state: State): State {
         actor.coins += 3
+        return state.createNextTurnState()
     }
 
 }
 
 class DukeCharacter(id: Int) : Character(id) {
     override val actions: List<ActionManifest> = listOf(TaxAction.MANIFEST)
-    override val blockedActions: Set<Action> = setOf()
+    override val blockedActions: Set<ActionManifest> = setOf()
 }

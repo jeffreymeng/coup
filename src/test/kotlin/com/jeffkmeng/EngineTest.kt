@@ -1,13 +1,14 @@
 package com.jeffkmeng
 
-import com.jeffkmeng.basegame.DukeCharacter
-import com.jeffkmeng.basegame.TaxAction
+import com.jeffkmeng.basegame.*
 import com.jeffkmeng.engine.*
 import kotlin.test.*
 
 
 class EngineTest {
     fun hiddenCharacters(vararg isAlive: Boolean) = isAlive.map { UIHiddenCharacter(it) }
+    // todo: why does this need to accept an ID? also, maybe generalize
+    // to accept an arbitrary type of character to create?
     fun createLiveDuke(id: Int) = UIVisibleCharacter(DukeCharacter(id))
     fun createDeadDuke(id: Int): UIVisibleCharacter {
         val duke = DukeCharacter(id)
@@ -98,5 +99,82 @@ class EngineTest {
         game.receiveMessage(ChallengeDecisionMessage(alice, false))
         assertIs<SelectActionState>(game.state)
         assertEquals(5, bob.coins)
+    }
+
+    @Test
+    fun testAssassin() {
+        val uAlice = User("alice", "Alice")
+        val uBob = User("bob", "Bob")
+        val game = Engine(
+            listOf(uAlice, uBob),
+            listOf(ContessaCharacter(0), AssassinCharacter(1), ContessaCharacter(2), AssassinCharacter(3)),
+            emptyList()
+        )
+        val alice = game.getPlayer(uAlice)
+        val bob = game.getPlayer(uBob)
+
+        assertEquals(alice, game.state.currentTurnPlayer)
+
+        // test that attempting to assassinate without enough money fails
+        assertFailsWith(IllegalMessageException::class) {
+            game.receiveMessage(SelectActionMessage(AssassinateAction(alice, bob)))
+        }
+
+        game.receiveMessage(SelectActionMessage(TaxAction(alice)))
+        game.receiveMessage(ChallengeDecisionMessage(bob, false))
+
+        game.receiveMessage(SelectActionMessage(TaxAction(bob)))
+        game.receiveMessage(ChallengeDecisionMessage(alice, false))
+
+        // test basic assassination: no challenges, no blocks
+        game.receiveMessage(SelectActionMessage(AssassinateAction(alice, bob)))
+        assertIs<ChallengeState>(game.state)
+        game.receiveMessage(ChallengeDecisionMessage(bob, false))
+        assertIs<BlockState>(game.state)
+        game.receiveMessage(BlockDecisionMessage(bob, false, null))
+        assertIs<SelectCardDeathState>(game.state)
+        game.receiveMessage(SelectCardDeathMessage(bob, 0))
+        assertIs<SelectActionState>(game.state)
+        assertEquals(bob, game.state.currentTurnPlayer)
+
+        // test double assassination: challenge fails, block succeeds
+        game.receiveMessage(SelectActionMessage(AssassinateAction(bob, alice)))
+        game.receiveMessage(ChallengeDecisionMessage(alice, true))
+        // todo: bob needs to choose a new card
+        assertIs<SelectCardDeathState>(game.state)
+        assertEquals(mutableSetOf(alice), game.state.waitingOn)
+        game.receiveMessage(SelectCardDeathMessage(alice, 1))
+        assertIs<BlockState>(game.state)
+        assertEquals(mutableSetOf(alice), game.state.waitingOn)
+        // todo: why does contessaCharacter need an ID here?
+        game.receiveMessage(BlockDecisionMessage(alice, true, ContessaCharacter(0)))
+        assertIs<ChallengeBlockState>(game.state)
+        assertEquals(mutableSetOf(bob), game.state.waitingOn)
+        game.receiveMessage(ChallengeDecisionMessage(bob, true))
+
+        // todo: game over, bob died
+
+        var deadAssassin = AssassinCharacter(1)
+        deadAssassin.isAlive = false
+        val aliceState = UIState(
+            uAlice,
+            listOf(
+                UIPlayer(uAlice, listOf(UIVisibleCharacter(ContessaCharacter(0)), UIVisibleCharacter(deadAssassin)), 2),
+                UIPlayer(uBob, hiddenCharacters(false, false), 2)
+            )
+        )
+        var deadContessa = ContessaCharacter(2)
+        deadContessa.isAlive = false
+        deadAssassin = AssassinCharacter(3)
+        deadAssassin.isAlive = false
+        val bobState = UIState(
+            uBob,
+            listOf(
+                UIPlayer(uAlice, hiddenCharacters(true, false), 2),
+                UIPlayer(uBob, listOf(UIVisibleCharacter(deadContessa), UIVisibleCharacter(deadAssassin)), 2)
+            )
+        )
+        assertEquals(aliceState, game.getUIState(uAlice))
+        assertEquals(bobState, game.getUIState(uBob))
     }
 }
